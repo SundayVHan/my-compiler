@@ -232,13 +232,16 @@ func (lex *Lexer) NextToken() Token {
 		}
 
 		if isDigit(lex.ch) {
-			literal := lex.readNumber()
-			//todo 这里目前只能支持int
-			intVal, err := strconv.Atoi(literal)
-			if err != nil {
-				lex.reportError(err, lex.line, lex.column)
+			literal, typ := lex.readNumber()
+			var val interface{}
+			if typ == INT {
+				val, _ = strconv.ParseInt(literal, 10, 64)
 			}
-			tok = newToken(INT, intVal, lex.line, lex.column)
+			if typ == FLOAT {
+				val, _ = strconv.ParseFloat(literal, 64)
+			}
+
+			tok = newToken(typ, val, lex.line, lex.column)
 			return tok
 		}
 
@@ -291,17 +294,24 @@ func (lex *Lexer) readIdentifier() string {
 
 // 读取一个标识符，以数字开头，向后一直读到非数字
 // 如果在结束后，发现终止的字符并非空格（换行）则报错并退出
-func (lex *Lexer) readNumber() string {
+func (lex *Lexer) readNumber() (string, TokenType) {
 	number := make([]byte, 0, 10)
-	for isDigit(lex.ch) {
+	isFloat := false                       // 标记是否是浮点数
+	for isDigit(lex.ch) || lex.ch == '.' { // 添加对小数点的检查
+		if lex.ch == '.' {
+			isFloat = true
+		}
 		number = append(number, lex.ch)
 		lex.readChar()
 	}
 	if !(lex.ch == ' ' || lex.ch == '\t' || lex.ch == '\r' || lex.ch == '\n') {
 		lex.reportError(errors.New("illegal number"), lex.line, lex.column)
 	}
-
-	return string(number)
+	if isFloat {
+		return string(number), FLOAT
+	} else {
+		return string(number), INT
+	}
 }
 
 // 打印错误并退出程序
